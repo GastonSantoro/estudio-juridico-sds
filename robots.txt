@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+# El Sitemap se agrega al elegir el dominio: node tools/set-domain.mjs https://dominio-elegido.com.ar
