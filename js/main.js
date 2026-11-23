@@ -1,16 +1,17 @@
 /* ==========================================================================
-   Sebastian de Souza — Abogado · Lógica del sitio
-   Módulos: año del pie · menú móvil · aparición discreta · mapa bajo demanda
-            · botón flotante de WhatsApp · formulario de consultas
+   de Souza Abogados — Lógica del sitio
+   Módulos: año del pie · menú móvil · encabezado al scrollear · aparición
+            · áreas complementarias · mapa bajo demanda · WhatsApp flotante
+            · formulario de consultas · ScrollSpy
    ========================================================================== */
 (function () {
   'use strict';
 
-  /* Datos de contacto usados por el formulario cuando no hay servicio activo.
-     Si cambia el número o el correo, actualizar también los enlaces de los HTML (ver README). */
+  /* Datos usados por el formulario cuando no hay servicio de envío activo.
+     Si cambian, actualizar también los enlaces de los HTML (ver README). */
   var CONTACT = {
-    whatsappNumber: '5491141988876', // 54 (Argentina) + 9 (móvil) + 11 4198-8876
-    email: 'sebastiandesouza.abogado@gmail.com'
+    whatsappNumber: '5492202544238', // +54 9 2202 54 4238
+    email: 'abogadosdesouza@gmail.com'
   };
 
   var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -59,36 +60,32 @@
     syncInert();
   })();
 
-  /* ---------- Transición suave del encabezado al hacer scroll ---------- */
+  /* ---------- Encabezado: transición suave al hacer scroll ---------- */
   (function initHeaderScroll() {
     var header = document.querySelector('.site-header');
     if (!header) return;
+    // Páginas interiores: el encabezado queda siempre sólido
+    if (header.hasAttribute('data-solid')) { header.classList.add('is-scrolled'); return; }
     var ticking = false;
-    function checkHeader() {
+    function check() {
       ticking = false;
-      var scrollY = window.pageYOffset || document.documentElement.scrollTop;
-      header.classList.toggle('is-scrolled', scrollY > 20);
+      var y = window.pageYOffset || document.documentElement.scrollTop;
+      header.classList.toggle('is-scrolled', y > 20);
     }
     window.addEventListener('scroll', function () {
-      if (!ticking) {
-        window.requestAnimationFrame(checkHeader);
-        ticking = true;
-      }
+      if (!ticking) { window.requestAnimationFrame(check); ticking = true; }
     }, { passive: true });
-    checkHeader();
+    check();
   })();
 
-  /* ---------- Aparición fluida y elegante de elementos al hacer scroll ---------- */
+  /* ---------- Aparición fluida al hacer scroll ---------- */
   (function initReveal() {
     var items = document.querySelectorAll('.reveal');
     if (!items.length || reducedMotion || !('IntersectionObserver' in window)) return;
     document.documentElement.classList.add('reveal-ready');
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible');
-          io.unobserve(entry.target);
-        }
+        if (entry.isIntersecting) { entry.target.classList.add('is-visible'); io.unobserve(entry.target); }
       });
     }, { rootMargin: '0px 0px -6% 0px', threshold: 0.05 });
     items.forEach(function (el) { io.observe(el); });
@@ -96,6 +93,24 @@
     window.setTimeout(function () {
       items.forEach(function (el) { el.classList.add('is-visible'); });
     }, 3500);
+  })();
+
+  /* ---------- Áreas de práctica: desplegar las áreas complementarias ---------- */
+  (function initAreas() {
+    var btn = document.getElementById('areas-toggle');
+    var extra = document.getElementById('areas-extra');
+    if (!btn || !extra) return;
+
+    function setOpen(open) {
+      extra.classList.toggle('is-open', open);
+      if (open) { extra.removeAttribute('inert'); } else { extra.setAttribute('inert', ''); }
+      btn.setAttribute('aria-expanded', String(open));
+      btn.textContent = btn.getAttribute(open ? 'data-label-close' : 'data-label-open');
+    }
+    btn.addEventListener('click', function () {
+      setOpen(btn.getAttribute('aria-expanded') !== 'true');
+    });
+    setOpen(false);
   })();
 
   /* ---------- Mapa bajo demanda (evita cargar Google al abrir la página) ---------- */
@@ -145,30 +160,21 @@
     var openedAt = Date.now();
     var sending = false;
 
-    // Preselecciona el área si se llegó desde la URL o al hacer clic en las áreas
+    // Preselecciona el área al llegar desde la URL o al pulsar "Consultar" en un área
     function preselectArea(val) {
       if (!val) return;
       var clean = String(val).replace(/[^a-z0-9-]/gi, '');
       var select = form.elements['topic'];
-      if (select && select.querySelector('option[value="' + clean + '"]')) {
-        select.value = clean;
-      }
+      if (select && select.querySelector('option[value="' + clean + '"]')) select.value = clean;
     }
-
-    try {
-      var areaParam = new URLSearchParams(window.location.search).get('area');
-      preselectArea(areaParam);
-    } catch (err) { /* sin parámetros */ }
-
-    document.querySelectorAll('[data-select-area]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        preselectArea(btn.getAttribute('data-select-area'));
-      });
+    try { preselectArea(new URLSearchParams(window.location.search).get('area')); } catch (err) { /* sin parámetros */ }
+    document.querySelectorAll('[data-select-area]').forEach(function (link) {
+      link.addEventListener('click', function () { preselectArea(link.getAttribute('data-select-area')); });
     });
 
     var rules = {
       name: function (v) {
-        return v.trim().length >= 2 ? '' : 'Ingrese su nombre y apellido.';
+        return v.trim().length >= 2 ? '' : 'Ingrese su nombre.';
       },
       contact: function (v) {
         v = v.trim();
@@ -222,7 +228,6 @@
     }
 
     // Los errores se muestran al enviar y se revalidan en vivo solo en campos ya marcados.
-    // (No se valida al salir del campo: el mensaje desplazaría el botón y podría anular el clic.)
     form.addEventListener('input', function (e) {
       if (e.target.getAttribute('aria-invalid') === 'true') validateField(e.target);
     });
@@ -262,7 +267,7 @@
       wa.textContent = 'Enviar por WhatsApp';
 
       var mail = document.createElement('a');
-      mail.className = 'btn btn--ghost';
+      mail.className = 'btn btn--secondary';
       var body = data.message + '\n\nNombre: ' + data.name + '\nContacto: ' + data.contact;
       mail.href = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent('Consulta desde el sitio web') + '&body=' + encodeURIComponent(body);
       mail.textContent = 'Enviar por correo';
@@ -339,7 +344,7 @@
     });
   })();
 
-  /* ---------- Navegación One-Page: ScrollSpy para actualizar aria-current ---------- */
+  /* ---------- Navegación One-Page: ScrollSpy (aria-current) ---------- */
   (function initScrollSpy() {
     var navLinks = document.querySelectorAll('#site-nav .site-nav__link[href^="#"]');
     if (!navLinks.length) return;
@@ -356,49 +361,32 @@
     function updateActive() {
       ticking = false;
       var scrollY = window.pageYOffset || document.documentElement.scrollTop;
-      var innerHeight = window.innerHeight;
-      var scrollHeight = document.documentElement.scrollHeight;
-      var atBottom = (scrollY + innerHeight) >= (scrollHeight - 60);
+      var atBottom = (scrollY + window.innerHeight) >= (document.documentElement.scrollHeight - 60);
+      var header = document.querySelector('.site-header');
+      var offset = (header ? header.getBoundingClientRect().height : 72) + 80;
 
-      var currentId = sections[0].id;
-
+      // En la portada ninguna sección del menú está activa
+      var currentId = null;
       if (atBottom) {
         currentId = sections[sections.length - 1].id;
       } else {
-        var header = document.querySelector('.site-header');
-        var headerOffset = (header ? header.getBoundingClientRect().height : 76) + 40;
         for (var i = 0; i < sections.length; i++) {
-          var rect = sections[i].el.getBoundingClientRect();
-          if (rect.top <= headerOffset) {
-            currentId = sections[i].id;
-          }
+          if (sections[i].el.getBoundingClientRect().top <= offset) currentId = sections[i].id;
         }
       }
 
       sections.forEach(function (item) {
-        if (item.id === currentId) {
-          item.link.setAttribute('aria-current', 'page');
-        } else {
-          item.link.removeAttribute('aria-current');
-        }
+        if (item.id === currentId) item.link.setAttribute('aria-current', 'page');
+        else item.link.removeAttribute('aria-current');
       });
     }
 
     window.addEventListener('scroll', function () {
-      if (!ticking) {
-        window.requestAnimationFrame(updateActive);
-        ticking = true;
-      }
+      if (!ticking) { window.requestAnimationFrame(updateActive); ticking = true; }
     }, { passive: true });
-
     window.addEventListener('resize', function () {
-      if (!ticking) {
-        window.requestAnimationFrame(updateActive);
-        ticking = true;
-      }
+      if (!ticking) { window.requestAnimationFrame(updateActive); ticking = true; }
     }, { passive: true });
-
     updateActive();
   })();
 })();
-
