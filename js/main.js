@@ -148,17 +148,15 @@
     zones.forEach(function (z) { io.observe(z); });
   })();
 
-  /* ---------- Formulario de consultas (FormSubmit.co vía AJAX) ---------- */
+  /* ---------- Formulario de consultas (FormSubmit.co — envío HTML nativo) ---------- */
   (function initForm() {
     var form = document.getElementById('consulta-form');
     if (!form) return;
 
-    var endpoint = (form.getAttribute('data-ajax-endpoint') || 'https://formsubmit.co/ajax/' + CONTACT.email).trim();
     var status = document.getElementById('form-status');
     var submit = form.querySelector('[type="submit"]');
-    var submitLabel = submit.textContent;
     var openedAt = Date.now();
-    var sending = false;
+    var submitting = false;
 
     var fields = {
       name: document.getElementById('f-name'),
@@ -166,8 +164,12 @@
       topic: document.getElementById('f-topic'),
       message: document.getElementById('f-message'),
       privacy: document.getElementById('f-privacy'),
-      honey: document.getElementById('f-honey')
+      honey: document.getElementById('f-honey'),
+      next: document.getElementById('f-next')
     };
+
+    // Redirección de regreso al sitio tras el envío nativo en FormSubmit
+    if (fields.next) fields.next.value = window.location.href;
 
     // Preselecciona el área al llegar desde la URL o al pulsar "Consultar" en un área
     function preselectArea(val) {
@@ -258,7 +260,7 @@
       status.textContent = '';
     }
 
-    function showStatus(kind, title, text, extra) {
+    function showStatus(kind, title, text) {
       status.className = 'form-status form-status--' + kind + ' is-visible';
       status.textContent = '';
       var strong = document.createElement('strong');
@@ -267,48 +269,17 @@
       var p = document.createElement('span');
       p.textContent = text;
       status.appendChild(p);
-      if (extra) status.appendChild(extra);
       status.setAttribute('tabindex', '-1');
       status.focus();
     }
 
-    function fallbackActions(data) {
-      var summary = 'Hola, soy ' + data.name + '. ' + data.message;
-      if (summary.length > 1200) summary = summary.slice(0, 1200) + '…';
-      var row = document.createElement('div');
-      row.className = 'btn-row';
-
-      var wa = document.createElement('a');
-      wa.className = 'btn btn--primary';
-      wa.href = 'https://wa.me/' + CONTACT.whatsappNumber + '?text=' + encodeURIComponent(summary);
-      wa.target = '_blank'; wa.rel = 'noopener noreferrer';
-      wa.textContent = 'Enviar por WhatsApp';
-
-      var mail = document.createElement('a');
-      mail.className = 'btn btn--secondary';
-      var body = data.message + '\n\nNombre: ' + data.name + '\nContacto: ' + data.contact;
-      mail.href = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent('Nueva consulta desde la web — de Souza Abogados') + '&body=' + encodeURIComponent(body);
-      mail.textContent = 'Enviar por correo';
-
-      row.appendChild(wa); row.appendChild(mail);
-      return row;
-    }
-
-    function setSending(on) {
-      sending = on;
-      submit.disabled = on;
-      submit.setAttribute('aria-disabled', String(on));
-      submit.textContent = on ? 'Enviando…' : submitLabel;
-      form.setAttribute('aria-busy', String(on));
-    }
-
     form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      if (sending) return;
+      if (submitting) { e.preventDefault(); return; }
       clearStatus();
 
       var invalid = validateAll();
       if (invalid) {
+        e.preventDefault();
         showStatus('error', 'Revise el formulario.', 'Hay campos que necesitan corrección. Los detalles están indicados debajo de cada campo.');
         invalid.focus();
         return;
@@ -316,52 +287,15 @@
 
       // Campo trampa (_honey) y tiempo mínimo: protección antispam
       if ((fields.honey && fields.honey.value) || Date.now() - openedAt < 3000) {
+        e.preventDefault();
         showStatus('error', 'No se pudo enviar.', 'Espere unos segundos e intente nuevamente.');
         return;
       }
 
-      var data = {
-        name: fields.name.value.trim(),
-        contact: fields.contact.value.trim(),
-        topic: (fields.topic && fields.topic.value)
-          ? fields.topic.options[fields.topic.selectedIndex].text
-          : 'No especificada',
-        message: fields.message.value.trim()
-      };
-
-      var payload = {
-        Nombre: data.name,
-        'Teléfono o email': data.contact,
-        'Área de consulta': data.topic,
-        Mensaje: data.message,
-        _subject: (form.elements['_subject'] && form.elements['_subject'].value) || 'Nueva consulta desde la web — de Souza Abogados',
-        _template: (form.elements['_template'] && form.elements['_template'].value) || 'table',
-        _captcha: (form.elements['_captcha'] && form.elements['_captcha'].value) || 'false',
-        _honey: ''
-      };
-      if (data.contact.indexOf('@') !== -1) payload._replyto = data.contact;
-
-      setSending(true);
-      fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json().catch(function () { return { success: true }; });
-      }).then(function (json) {
-        if (json && String(json.success) === 'false') throw new Error(json.message || 'Error del servicio');
-        form.reset();
-        openedAt = Date.now();
-        showStatus('success', 'Consulta enviada.', 'Recibimos su mensaje correctamente. Nos pondremos en contacto con usted a la brevedad.');
-      }).catch(function () {
-        showStatus(
-          'error',
-          'No pudimos enviar su consulta.',
-          'Ocurrió un problema de conexión o del servicio. Sus datos no se perdieron en esta pantalla; puede intentar nuevamente o escribirnos por WhatsApp o correo:',
-          fallbackActions(data)
-        );
-      }).then(function () { setSending(false); });
+      // Si las validaciones pasan, el navegador envía el formulario de forma nativa a FormSubmit
+      if (fields.next) fields.next.value = window.location.href;
+      submitting = true;
+      if (submit) submit.textContent = 'Enviando…';
     });
   })();
 

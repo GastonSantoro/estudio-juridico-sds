@@ -361,10 +361,10 @@
             <h3>Enviar una consulta</h3>
             <p class="form-intro">Cuéntenos brevemente de qué se trata y nos comunicaremos con usted. Por favor, no incluya números de documento, datos bancarios, documentación judicial ni información sensible en este formulario.</p>
 
-            <form class="form" id="consulta-form" action="https://formsubmit.co/abogadosdesouza@gmail.com" method="POST" novalidate data-ajax-endpoint="https://formsubmit.co/ajax/abogadosdesouza@gmail.com">
+            <form class="form" id="consulta-form" action="https://formsubmit.co/abogadosdesouza@gmail.com" method="POST" novalidate>
               <input type="hidden" name="_subject" value="Nueva consulta desde la web — de Souza Abogados">
               <input type="hidden" name="_template" value="table">
-              <input type="hidden" name="_captcha" value="false">
+              <input type="hidden" id="f-next" name="_next" value="">
 
               <div class="field">
                 <label class="field__label" for="f-name">Nombre</label>

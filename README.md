@@ -46,12 +46,11 @@ Vista previa local: cualquier servidor estático (p. ej. `npx serve .` o `python
 
 ## Formulario de consultas
 
-Configurado para envío directo por **FormSubmit.co** (`https://formsubmit.co/abogadosdesouza@gmail.com` como `action` nativo y `https://formsubmit.co/ajax/abogadosdesouza@gmail.com` vía `fetch` con `Accept: application/json`), sin claves API ni backend:
+Configurado para envío HTML nativo directo por **FormSubmit.co** (`action="https://formsubmit.co/abogadosdesouza@gmail.com"`, `method="POST"`), sin claves API ni backend:
 
 - Campos en español (`Nombre`, `Teléfono o email`, `Área de consulta`, `Mensaje`) y formato de correo en tabla (`_template=table`).
-- Protección antispam con campo trampa `_honey` y tiempo mínimo de 3 s antes de enviar.
-- Si ocurre un error de red o del servicio, se conservan los datos y se muestran botones directos a WhatsApp y correo con el mensaje preparado.
-- **Activación única de FormSubmit:** al realizar el primer envío de prueba desde la web publicada (por `http://` o `https://`), FormSubmit enviará un correo de confirmación única a `abogadosdesouza@gmail.com`. Una vez confirmado ese enlace, todos los envíos llegarán automáticamente.
+- Validación previa en cliente antes del envío, protección antispam con campo trampa `_honey` y redirección automática de regreso al sitio mediante `_next` (asignado dinámicamente con `window.location.href`).
+- **Activación única de FormSubmit:** al realizar el primer envío de prueba desde la web publicada (por `http://` o `https://`), FormSubmit mostrará el captcha de activación y enviará un correo de confirmación única a `abogadosdesouza@gmail.com`. Una vez confirmado, todos los envíos llegarán automáticamente.
 
 ## Privacidad y seguridad
 
