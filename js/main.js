@@ -148,24 +148,32 @@
     zones.forEach(function (z) { io.observe(z); });
   })();
 
-  /* ---------- Formulario de consultas ---------- */
+  /* ---------- Formulario de consultas (FormSubmit.co vía AJAX) ---------- */
   (function initForm() {
     var form = document.getElementById('consulta-form');
     if (!form) return;
 
-    function getEndpoint() { return (form.getAttribute('data-endpoint') || '').trim(); }
+    var endpoint = (form.getAttribute('data-ajax-endpoint') || 'https://formsubmit.co/ajax/' + CONTACT.email).trim();
     var status = document.getElementById('form-status');
     var submit = form.querySelector('[type="submit"]');
     var submitLabel = submit.textContent;
     var openedAt = Date.now();
     var sending = false;
 
+    var fields = {
+      name: document.getElementById('f-name'),
+      contact: document.getElementById('f-contact'),
+      topic: document.getElementById('f-topic'),
+      message: document.getElementById('f-message'),
+      privacy: document.getElementById('f-privacy'),
+      honey: document.getElementById('f-honey')
+    };
+
     // Preselecciona el área al llegar desde la URL o al pulsar "Consultar" en un área
     function preselectArea(val) {
-      if (!val) return;
+      if (!val || !fields.topic) return;
       var clean = String(val).replace(/[^a-z0-9-]/gi, '');
-      var select = form.elements['topic'];
-      if (select && select.querySelector('option[value="' + clean + '"]')) select.value = clean;
+      if (fields.topic.querySelector('option[value="' + clean + '"]')) fields.topic.value = clean;
     }
     try { preselectArea(new URLSearchParams(window.location.search).get('area')); } catch (err) { /* sin parámetros */ }
     document.querySelectorAll('[data-select-area]').forEach(function (link) {
@@ -173,34 +181,44 @@
     });
 
     var rules = {
-      name: function (v) {
-        return v.trim().length >= 2 ? '' : 'Ingrese su nombre.';
-      },
-      contact: function (v) {
-        v = v.trim();
-        if (!v) return 'Ingrese un correo electrónico o un teléfono para poder responderle.';
-        if (v.indexOf('@') !== -1) {
-          return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? '' : 'El correo electrónico no parece válido. Revise que tenga el formato nombre@dominio.com.';
+      'f-name': {
+        errorId: 'error-name',
+        check: function (v) {
+          return v.trim().length >= 2 ? '' : 'Ingrese su nombre.';
         }
-        var digits = v.replace(/\D/g, '');
-        return (/^[+\d\s().-]+$/.test(v) && digits.length >= 8 && digits.length <= 15)
-          ? '' : 'Ingrese un teléfono con código de área (por ejemplo, 11 1234-5678) o un correo electrónico válido.';
       },
-      message: function (v) {
-        v = v.trim();
-        if (v.length < 10) return 'Cuéntenos brevemente su consulta (al menos 10 caracteres).';
-        if (v.length > 2000) return 'El mensaje es demasiado largo. Resúmalo en un máximo de 2000 caracteres.';
-        return '';
+      'f-contact': {
+        errorId: 'error-contact',
+        check: function (v) {
+          v = v.trim();
+          if (!v) return 'Ingrese un correo electrónico o un teléfono para poder responderle.';
+          if (v.indexOf('@') !== -1) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? '' : 'El correo electrónico no parece válido. Revise que tenga el formato nombre@dominio.com.';
+          }
+          var digits = v.replace(/\D/g, '');
+          return (/^[+\d\s().-]+$/.test(v) && digits.length >= 8 && digits.length <= 15)
+            ? '' : 'Ingrese un teléfono con código de área (por ejemplo, 11 1234-5678) o un correo electrónico válido.';
+        }
       },
-      privacy: function (v, el) {
-        return el.checked ? '' : 'Para enviar la consulta debe confirmar que leyó el aviso de privacidad.';
+      'f-message': {
+        errorId: 'error-message',
+        check: function (v) {
+          v = v.trim();
+          if (v.length < 10) return 'Cuéntenos brevemente su consulta (al menos 10 caracteres).';
+          if (v.length > 2000) return 'El mensaje es demasiado largo. Resúmalo en un máximo de 2000 caracteres.';
+          return '';
+        }
+      },
+      'f-privacy': {
+        errorId: 'error-privacy',
+        check: function (v, el) {
+          return el.checked ? '' : 'Para enviar la consulta debe confirmar que leyó el aviso de privacidad.';
+        }
       }
     };
 
-    function errorBox(name) { return document.getElementById('error-' + name); }
-
-    function setError(el, message) {
-      var box = errorBox(el.name);
+    function setError(el, errorId, message) {
+      var box = document.getElementById(errorId);
       if (message) {
         el.setAttribute('aria-invalid', 'true');
         if (box) { box.textContent = message; box.classList.add('is-visible'); }
@@ -211,17 +229,17 @@
     }
 
     function validateField(el) {
-      var rule = rules[el.name];
+      var rule = el && rules[el.id];
       if (!rule) return true;
-      var message = rule(el.value || '', el);
-      setError(el, message);
+      var message = rule.check(el.value || '', el);
+      setError(el, rule.errorId, message);
       return !message;
     }
 
     function validateAll() {
       var firstInvalid = null;
-      Object.keys(rules).forEach(function (name) {
-        var el = form.elements[name];
+      Object.keys(rules).forEach(function (id) {
+        var el = document.getElementById(id);
         if (el && !validateField(el) && !firstInvalid) firstInvalid = el;
       });
       return firstInvalid;
@@ -269,7 +287,7 @@
       var mail = document.createElement('a');
       mail.className = 'btn btn--secondary';
       var body = data.message + '\n\nNombre: ' + data.name + '\nContacto: ' + data.contact;
-      mail.href = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent('Consulta desde el sitio web') + '&body=' + encodeURIComponent(body);
+      mail.href = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent('Nueva consulta desde la web — de Souza Abogados') + '&body=' + encodeURIComponent(body);
       mail.textContent = 'Enviar por correo';
 
       row.appendChild(wa); row.appendChild(mail);
@@ -296,48 +314,51 @@
         return;
       }
 
-      // Campo trampa y tiempo mínimo: protección básica contra envíos automatizados
-      var trap = form.elements['_gotcha'];
-      if ((trap && trap.value) || Date.now() - openedAt < 3000) {
+      // Campo trampa (_honey) y tiempo mínimo: protección antispam
+      if ((fields.honey && fields.honey.value) || Date.now() - openedAt < 3000) {
         showStatus('error', 'No se pudo enviar.', 'Espere unos segundos e intente nuevamente.');
         return;
       }
 
       var data = {
-        name: form.elements['name'].value.trim(),
-        contact: form.elements['contact'].value.trim(),
-        topic: form.elements['topic'].value,
-        message: form.elements['message'].value.trim()
+        name: fields.name.value.trim(),
+        contact: fields.contact.value.trim(),
+        topic: (fields.topic && fields.topic.value)
+          ? fields.topic.options[fields.topic.selectedIndex].text
+          : 'No especificada',
+        message: fields.message.value.trim()
       };
 
-      var endpoint = getEndpoint();
-      // Sin servicio configurado NO se simula el envío (ver README → Formulario).
-      if (!endpoint) {
-        showStatus(
-          'info',
-          'El envío directo desde este formulario todavía no está habilitado.',
-          'Su consulta no fue enviada. Para que llegue al estudio puede usar cualquiera de estas vías, con el texto ya preparado:',
-          fallbackActions(data)
-        );
-        return;
-      }
+      var payload = {
+        Nombre: data.name,
+        'Teléfono o email': data.contact,
+        'Área de consulta': data.topic,
+        Mensaje: data.message,
+        _subject: (form.elements['_subject'] && form.elements['_subject'].value) || 'Nueva consulta desde la web — de Souza Abogados',
+        _template: (form.elements['_template'] && form.elements['_template'].value) || 'table',
+        _captcha: (form.elements['_captcha'] && form.elements['_captcha'].value) || 'false',
+        _honey: ''
+      };
+      if (data.contact.indexOf('@') !== -1) payload._replyto = data.contact;
 
       setSending(true);
-      var payload = Object.assign({}, data, { _subject: 'Consulta desde el sitio web — ' + data.name });
       fetch(endpoint, {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       }).then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json().catch(function () { return { success: true }; });
+      }).then(function (json) {
+        if (json && String(json.success) === 'false') throw new Error(json.message || 'Error del servicio');
         form.reset();
         openedAt = Date.now();
-        showStatus('success', 'Consulta enviada.', 'Recibimos su mensaje. Nos pondremos en contacto con usted a la brevedad.');
+        showStatus('success', 'Consulta enviada.', 'Recibimos su mensaje correctamente. Nos pondremos en contacto con usted a la brevedad.');
       }).catch(function () {
         showStatus(
           'error',
           'No pudimos enviar su consulta.',
-          'Ocurrió un problema de conexión o del servicio. Sus datos no se perdieron en esta pantalla; puede intentar nuevamente o escribirnos por otra vía:',
+          'Ocurrió un problema de conexión o del servicio. Sus datos no se perdieron en esta pantalla; puede intentar nuevamente o escribirnos por WhatsApp o correo:',
           fallbackActions(data)
         );
       }).then(function () { setSending(false); });
